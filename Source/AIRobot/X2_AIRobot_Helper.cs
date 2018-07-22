@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 //using System.Threading.Tasks;
 
@@ -8,6 +9,7 @@ using UnityEngine;
 using RimWorld;
 using Verse;
 using Verse.AI;
+using Harmony;
 
 namespace AIRobot
 {
@@ -18,7 +20,68 @@ namespace AIRobot
     /// <author>Haplo</author>
     /// <permission>For usage of this code, please look at the license information.</permission>
     [StaticConstructorOnStartup]
-    public class AIRobot_Helper
+
+    static class HarmonyPatches
+    {
+        // Harmony Patch Injector to exclude robots from Caravan UI Stack Check
+        static HarmonyPatches()
+        {
+            HarmonyInstance harmony = HarmonyInstance.Create("rimworld.roxxploxx.AIRobot");
+            MethodInfo targetmethod = AccessTools.Method(typeof(RimWorld.TransferableUtility), "CanStack");
+            HarmonyMethod prefixmethod = new HarmonyMethod(typeof(AIRobot.HarmonyPatches).GetMethod("CanStack_Prefix"));
+            harmony.Patch(targetmethod, prefixmethod, null);
+        }
+
+        // Replacement Class for excluding robots from Caravan UI Stack Check
+        public static bool CanStack_Prefix(Thing thing)
+        {
+            bool result;
+
+            if (thing.def.category == ThingCategory.Pawn)
+            {
+
+                if (thing.def.thingClass.ToString() == "AIRobot.X2_AIRobot")
+                {
+                    result = false;
+                    //Log.Message("found a robot, skipping stack check");
+                    return result;
+                }
+          
+                if (thing.def.race.Humanlike)
+                {
+                    result = false;
+                    return result;
+                }
+                Pawn pawn = (Pawn)thing;
+                if (pawn.health.summaryHealth.SummaryHealthPercent < 0.9999f)
+                {
+                    result = false;
+                    return result;
+                }
+                if (pawn.Name != null && !pawn.Name.Numerical)
+                {
+                    result = false;
+                    return result;
+                }
+                if (pawn.relations.GetFirstDirectRelationPawn(PawnRelationDefOf.Bond, null) != null)
+                {
+                    result = false;
+                    return result;
+                }
+                if (pawn.health.hediffSet.HasHediff(HediffDefOf.Pregnant, true))
+                {
+                    result = false;
+                    return result;
+                }
+            }
+            result = true;
+            return result;
+        }
+    }
+
+
+
+public class AIRobot_Helper
     {
         public static X2_Building_AIRobotRechargeStation FindRechargeStationFor(X2_AIRobot p)
         {
